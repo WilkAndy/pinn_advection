@@ -60,6 +60,8 @@ Assume the velocity, $v = 1$, so the analytic solution is $u(t, x) = f(x - t)$. 
 
 ![Surface plot of solution](analytic_solution.png)
 
-<video src = 'analytic_solution.mp4'>
+![Animated solution](analytic_solution.gif)
 
-![Animated solution](analytic_solution.mp4)
+## The PINN
+
+

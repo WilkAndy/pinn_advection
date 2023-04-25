@@ -23,19 +23,18 @@ ax.set_xlabel("t")
 ax.set_ylabel("x")
 ax.set_zlabel("u")
 plt.title("Analytic solution")
-plt.savefig("analytic_solution.png", bbox_inches = 'tight')
-#plt.show()
+plt.savefig("analytic_solution.png")
+plt.show()
 plt.close()
 
 fig = plt.figure()
 axis = plt.axes(xlim = (-1, 1), ylim = (-0.1, 1.1))
-line, = axis.plot([], [], linewidth = 1, color = 'r')
+line, = axis.plot([], [], linewidth = 2, color = 'r')
 time = axis.annotate(0, xy = (-0.9, 0.9), xytext = (-0.9, 0.9), fontsize = 13)
 def init():
     line.set_data([], [])
     time.set_text("t = 0.00")
     return time, line,
-xdata, ydata = [], []
 def animate(i):
     t = 0.01 * i
     xdata = np.linspace(-1, 1, 1000)
@@ -44,10 +43,11 @@ def animate(i):
     time.set_text("t = " + str(round(t, 2)))
     return time, line,
 anim = ani.FuncAnimation(fig, animate, init_func = init, frames = 101, interval = 20, blit = True)
+plt.grid()
 plt.xlabel("x")
 plt.ylabel("u")
 plt.title("Analytic solution")
-anim.save('analytic_solution.mp4', writer = 'ffmpeg', fps = 30)
+anim.save('analytic_solution.gif', fps = 30)
 plt.show()
 
 
