@@ -31,7 +31,16 @@ $$
 0 < f < 1 \ ,
 $$
 
-then at later times $u < 0$ and/or $u > 1$.  To get around this, many numerical schemes introduce "numerical diffusion", but if care is not taken, this means that after some time the numerical solution is just $u$ is constant, independent of the initial condition.  (An animation may be found [here](https://mooseframework.inl.gov/modules/porous_flow/numerical_diffusion.html).)  Of course, numerical techniques to get around these problems are known, but the advection equation is not as simple as expected.  Do PINNs suffer any difficulties?
+then at later times the numerical solution breaks these bounds ($u < 0$ and/or $u > 1$).  To get around this, many numerical schemes introduce "numerical diffusion", but if care is not taken, this means that after some time the numerical solution is $u = $ constant, independent of the initial condition.  (An animation may be found [here](https://mooseframework.inl.gov/modules/porous_flow/numerical_diffusion.html).)  Of course, numerical techniques to get around these problems are known, but the advection equation is not as simple as expected.  Do PINNs suffer any difficulties?
+
+## Required packages
+
+Python with [TensorFlow](https://www.tensorflow.org/) is used to solve the PINNs in this repository.  To run the python scripts, `matplotlib` and `tensorflow` are needed.  Install them using, for instance,
+
+```
+conda install -c conda-forge tensorflow
+conda install -c conda-forge matplotlib
+```
 
 ## Problem description
 
@@ -63,5 +72,7 @@ Assume the velocity, $v = 1$, so the analytic solution is $u(t, x) = f(x - t)$. 
 ![Animated solution](analytic_solution.gif)
 
 ## The PINN
+
+The PINN must have two inputs, $(t, x)$, and one output, $u$.  Raissi, Perdikaris and Karniadakis state that the PINN must be of sufficient complexity to be able to represent the solution, $u$.
 
 
