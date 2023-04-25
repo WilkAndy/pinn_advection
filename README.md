@@ -56,17 +56,8 @@ $$
 \frac{\partial}{\partial x}u(t, 1) = 0 \ .
 $$
 
-Assume the velocity, $v = 1$, so the analytic solution is $u(t, x) = f(x - t)$.
+Assume the velocity, $v = 1$, so the analytic solution is $u(t, x) = f(x - t)$.  This is shown in the following plots.
 
+![Surface plot of solution](analytic_solution.png)
 
-
-
-
-
-
-
-
-
-
-
-
+![Animated solution](analytic_solution.mp4)
