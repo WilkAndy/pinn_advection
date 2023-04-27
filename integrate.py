@@ -13,6 +13,10 @@ tf.keras.utils.set_random_seed(12)
 # This is different than a usual nonlinear regression neural network, where the values,
 # u, are known at certain x points, and the NN is trained to produce these values.
 # This code utilizes TensorFlow's automatic differentiation
+# However, the implementation deliberately tries to use an approach that is as simple
+# as possible.  For instance, the neural network descent process does not utilize the
+# automatic derivatives of the neural network with respect to its internal parameters
+# in a custom gradient descent algorithm: rather, the bulk-standard SGD is used.
 #########################################################################################
 
 X = tf.constant(np.linspace(0, 2 * np.pi, 1000), dtype = tf.float32) # domain of the problem
@@ -33,20 +37,11 @@ true_integral = value_at_0 + tf.math.sin(X)                          # for compa
 #true_integral = value_at_0 + tf.math.log(X + 0.5) - tf.math.log(0.5) # for comparing the results
 
 #########################################################################################
-# The code works by forming the loss function, which is a weighted sum of:
+# The code works by minimising the loss function, which is a weighted sum of:
 # - loss_bdy, which attempts to ensure that u(X[0]) - value_at_zero = 0, and
 # - loss_de, which attempts to ensure that du/dx - fcn = 0 at all the points defined by X
 # The relative weighting of each term obviously impacts the outcome.
 #########################################################################################
-
-@tf.function # decorate for speed
-def loss(ytrue, ypred):
-    ''' The loss used by the training algorithm.  Note that ytrue and ypred are not used,
-    but TensorFlow specifies these arguments
-    '''
-    bdy_weight = 1
-    de_weight = 1
-    return bdy_weight * loss_bdy(X, value_at_0) + de_weight * loss_de(X, fcn)
 
 def loss_bdy(x, val_at_zero):
     ''' Evaluate the boundary condition, ie u(0) - val_at_zero, where u is given by the NN model
@@ -66,11 +61,20 @@ def loss_de(x, function_values):
     # The loss is just the mean-squared du/dx - function_values
     return tf.reduce_mean(tf.square(u_x - function_values))
 
-#########################################################################################
+@tf.function # decorate for speed
+def loss(ytrue, ypred):
+    ''' The loss used by the training algorithm.  Note that ytrue and ypred are not used,
+    but TensorFlow specifies these arguments
+    '''
+    bdy_weight = 1
+    de_weight = 1
+    return bdy_weight * loss_bdy(X, value_at_0) + de_weight * loss_de(X, fcn)
+
+###############################################################################################
 # The remainder is just usual neural-net stuff with Keras
 # Note, the goodness of the fit depends quite strongly on the DE (the functional form of fcn),
 # the constant of integration, the architecture of the NN, and other hyperparameters
-#########################################################################################
+###############################################################################################
 depth = 5          # depth of NN
 width = 10         # width of fully-connected NN
 activation = 'elu' # alternatives 'selu', 'softplus', 'sigmoid', 'tanh', 'elu', 'relu'

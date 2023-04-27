@@ -5,22 +5,23 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 import matplotlib.animation as ani
 
-velocity = 1
+velocity = 1.2
 
 def solution(t, x):
-    return np.where(x - velocity * t <= 0, 1, 0)
+    window = 0.2
+    return np.where(x - velocity * t <= -1, 1, np.where(x - velocity * t >= -1 + 2 * window, 0, 0.5 + (x - velocity * t + 1 - window) * (np.power(x - velocity * t + 1 - window, 2) - 3 * np.power(window, 2)) / 4 / np.power(window, 3)))
 
 fig = plt.figure()
 ax = fig.add_subplot(111, projection = '3d')
 t = np.linspace(0, 1, 100)
 x = np.linspace(-1, 1, 100)
-T, X = np.meshgrid(t, x)
+X, T = np.meshgrid(x, t)
 u = np.array(solution(np.ravel(T), np.ravel(X)))
 U = u.reshape(X.shape)
-ax.plot_surface(T, X, U)
-ax.view_init(elev = 36, azim = -137)
-ax.set_xlabel("t")
-ax.set_ylabel("x")
+ax.plot_surface(X, T, U)
+ax.view_init(elev = 34, azim = -74)
+ax.set_xlabel("x")
+ax.set_ylabel("t")
 ax.set_zlabel("u")
 plt.title("Analytic solution")
 plt.savefig("analytic_solution.png")
