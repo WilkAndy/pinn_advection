@@ -4,6 +4,43 @@
 
 Physics-informed neural networks (PINNs) were [introduced](https://www.sciencedirect.com/science/article/pii/S0021999118307125) by Raissi, Perdikaris and Karniadakis in 2019, as a method of finding numerical solutions to continuous and discrete-time partial differential equations, as well as parameterising those equations using data.  In this repository, I want to concentrate on the case of finding a numerical solution to the continuous-time advection equation.  No doubt this has been done my many other authors, but I'm trying to teach myself!
 
+## Required packages
+
+Python with [TensorFlow](https://www.tensorflow.org/) is used to solve the PINNs in this repository.  To run the python scripts, `matplotlib` and `tensorflow` are needed.  Install them using, for instance,
+
+```
+conda install -c conda-forge tensorflow
+conda install -c conda-forge matplotlib
+```
+
+## Basic concept of the PINNs approach
+
+The approach assumes that the dynamics of a system are described by a differential equation
+
+##
+N(u) = 0
+##
+
+Here, $N$ is a differential operator, which is possibly nonlinear, and $u$ describes the system.  For instance, if $u$ represents temperature of a system, then $N$ might be the heat equation: $\mathrm{d}u/\mathrm{d}t = k\nabla^{2}u$.  The solution of $N(u)=0$ also depends on initial and boundary conditions
+
+$$
+B(u) = 0
+$$
+
+For instance, in the heat equation case, a uniform $u - 293 = 0$ might be the initial condition, and $\nabla_{n} u - 1 = 0$ might be prescribed on the boundaries (here $n$ is the normal to the boundary, and physically this means that the boundaries are providing a source of heat).  It is assumed that there is a unique solution to this physical setup.
+
+The PINN approach builds a standard neural network that outputs $u$, given space-time coordinates.  What is unique in the PINN approach is that the loss function is
+
+$$
+\mathrm{Loss} = a |N(u)| + b |B(u)|
+$$
+
+Here the $|\cdot|$ notation indicates some norm.  For instance, $|N(u)| = \sum_{t, x}|N(u(t, x))|^{2}$, where the sum runs over some points in the interior of the space-time domain.  Similarly, $|B(u)| = \sum_{t_{\ast}, x_{\ast}}|B(u(t_{\ast}, x_{\ast}))|^{2}$, where the sum runs over some points on the boundary of the space-time domain.  Note the fundamental difference with usual neural networks: *the loss depends on derivatives of the neural network's output value with respect to its input values*.  These derivatives are calculated using automatic differentiation.
+
+The remainder of the PINN approach appears to be just gloss (albeit, very important gloss that may critically influence convergence).  The critical point is that the loss function is unusual.
+
+## The advection equation
+
 The advection equation in 1 spatial dimension is
 
 $$
@@ -33,18 +70,41 @@ $$
 
 then at later times the numerical solution breaks these bounds ($u < 0$ and/or $u > 1$).  To get around this, many numerical schemes introduce "numerical diffusion", but if care is not taken, this means that after some time the numerical solution is $u = $ constant, independent of the initial condition.  (An animation may be found [here](https://mooseframework.inl.gov/modules/porous_flow/numerical_diffusion.html).)  Of course, numerical techniques to get around these problems are known, but the advection equation is not as simple as expected.  Do PINNs suffer any difficulties?
 
-## Required packages
+## The specific problem explored here
 
-Python with [TensorFlow](https://www.tensorflow.org/) is used to solve the PINNs in this repository.  To run the python scripts, `matplotlib` and `tensorflow` are needed.  Install them using, for instance,
+Assume the spatial domain is bounded: $-1 \leq x \leq 1$.  Assume the initial condition is
 
-```
-conda install -c conda-forge tensorflow
-conda install -c conda-forge matplotlib
-```
+$$u(0, x) = f(x) = \left\\{
+\begin{array}{ll}
+1 & x \leq -1 \\
+\frac{1}{2} + \frac{(x + 1 - w)((x + 1 - w)^{2} - 3w^{2})}{4w^{3}} & -1 < x < -1 + 2w \\
+0 & x \geq -1 + 2w
+\end{array}\right.
+$$
+
+Here $w$ is the "window size".  The nasty-looking cubic is chosen so that $f$ smoothly transitions from 1 (at $x\leq -1$) to 0 (for $x\geq -1 + 2w$), that is, $f$ is differentiable.  As $w\rightarrow 0$, $f$ tends to a step function (see figures below).
+
+Assume the boundary conditions are Dirichlet (fixed value) on the left:
+
+$$
+u(t, -1) = 1 \ ,
+$$
+
+and Neumann (fixed flux, which is zero in this case) on the right:
+
+$$
+\frac{\partial}{\partial x}u(t, 1) = 0 \ .
+$$
+
+Assume the velocity, $v = 1.2$.  The analytic solution is $u(t, x) = f(x - vt)$.  This is shown in the following plots.
+
+![Surface plot of solution](analytic_solution.png)
+
+![Animated solution](analytic_solution.gif)
 
 ## A primer: integrating a function
 
-As a primer for the advection problem, consider building a neural network to find $u$, where the derivative of $u$ is known.  That is, given $f(x)$, find $u(x)# such that
+As a primer for the advection problem, consider building a neural network to find $u$, where the derivative of $u$ is known.  That is, given $f(x)$, find $u(x)$ such that
 
 $$
 \frac{\mathrm{d}u}{\mathrm{d}x} = f(x) \ .
@@ -55,7 +115,7 @@ This means the neural network is integrating the function $f$.  In addition, ass
 - $\mathrm{d}u/\mathrm{d}x = f$ is equivalent to the PDE
 - $u(0) = u_{0}$ is equivalent to the boundary and initial conditions.
 
-This problem is different than usual nonlinear regression using a neural network.  In the usual case, the values, $u$, are known at certain $x$ points, and the neural network is trained to produce these values.  Nevertheless, most of the usual neural-network architecture can be used for this integration problem.  All that is required is to build an appropriate loss function, and let the usual netural-network machinery find the solution.
+This problem is different than usual nonlinear regression using a neural network.  In the usual case, the values, $u$, are known at certain $x$ points, and the neural network is trained to produce these values.  Nevertheless, most of the usual neural-network architecture can be used for this integration problem.  All that is required is to build an appropriate loss function, and the usual netural-network machinery is used find the solution.
 
 The code to perform the integration is in [integrate.py](integrate.py).
 
@@ -68,7 +128,7 @@ def loss_de(x, function_values):
     # First, use TensorFlow automatic differentiation to evaluate du/dx, at the points x, where u is given by the NN model
     with tf.GradientTape(persistent = True) as tp:
         tp.watch(x)
-        u = model(x) # "model" is the NN's value
+        u = model(x) # "model" is the NN's output value, given x
     u_x = tp.gradient(u, x)
     del tp
     # The loss is just the mean-squared du/dx - function_values
@@ -102,34 +162,6 @@ The following figure shows the result for $f(x) = \cos(x)$ and $u_{0} = 0.7$:
 
 ![Result of integrating a function](integrate.png)
 
-## Problem description
-
-Assume the spatial domain is bounded: $-1 \leq x \leq 1$.  Assume the initial condition is
-
-$$u(0, x) = f(x) = \left\\{
-\begin{array}{ll}
-1 & x \leq 0 \\
-0 & x > 0
-\end{array}\right.
-$$
-
-Assume the boundary conditions are Dirichlet (fixed value) on the left:
-
-$$
-u(t, -1) = 1 \ ,
-$$
-
-and Neumann (fixed flux, which is zero in this case) on the right:
-
-$$
-\frac{\partial}{\partial x}u(t, 1) = 0 \ .
-$$
-
-Assume the velocity, $v = 1$, so the analytic solution is $u(t, x) = f(x - t)$.  This is shown in the following plots.
-
-![Surface plot of solution](analytic_solution.png)
-
-![Animated solution](analytic_solution.gif)
 
 ## The PINN
 
