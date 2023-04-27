@@ -165,6 +165,113 @@ The following figure shows the result for $f(x) = \cos(x)$ and $u_{0} = 0.7$:
 
 ## The PINN
 
-The PINN must have two inputs, $(t, x)$, and one output, $u$.  Raissi, Perdikaris and Karniadakis state that the PINN must be of sufficient complexity to be able to represent the solution, $u$.
+The PINN must have two inputs, $(t, x)$, and one output, $u$.  Raissi, Perdikaris and Karniadakis state that the PINN must be of sufficient complexity to be able to represent the solution, $u$.  For the advection problem described above, the following neural network is sufficient:
 
+```
+depth = 5           # depth of NN
+width = 10          # width of fully-connected NN
+activation = 'relu' # alternatives 'selu', 'softplus', 'sigmoid', 'tanh', 'elu', 'relu'
+epochs = 1000       # training epochs
+batch_size = 1000   # batch size
+model = Sequential()
+model.add(Dense(width, kernel_initializer = 'normal', activation = activation, input_shape = (2, )))
+for d in range(1, depth):
+    model.add(Dense(width, kernel_initializer = 'normal', activation = activation))
+model.add(Dense(1, kernel_initializer = 'normal', activation = activation))
+```
+
+In order to evaluate the loss function, points on the space-time boundary as well as its interior need to be defined.  The initial conditions, boundary conditions and the advection equation are evaluated (using the neural network) at these points.  In the following code snipped the `front` function is the cubic defined above.
+
+```
+num_initial = 10000
+num_dirichlet = 101
+num_neumann = 102
+num_interior = 10000
+T_initial = tf.constant([0] * num_initial, dtype = tf.float32)
+X_initial = tf.random.uniform(shape = [num_initial], minval = -1, maxval = 1, dtype = tf.float32)
+vals_initial = front(X_initial)
+T_dirichlet = tf.random.uniform(shape = [num_dirichlet], minval = 0, maxval = 1, dtype = tf.float32)
+X_dirichlet = tf.constant([-1] * num_dirichlet, dtype = tf.float32)
+vals_dirichlet = tf.constant([1] * num_dirichlet, dtype = tf.float32)
+T_neumann = tf.random.uniform(shape = [num_neumann], minval = 0, maxval = 1, dtype = tf.float32)
+X_neumann = tf.constant([1] * num_neumann, dtype = tf.float32)
+flux_neumann = tf.constant([0] * num_neumann, dtype = tf.float32)
+T_interior = tf.random.uniform(shape = [num_interior], minval = 0, maxval = 1, dtype = tf.float32)
+X_interior = tf.random.uniform(shape = [num_interior], minval = -1, maxval = 1, dtype = tf.float32)
+```
+
+The loss function is a weighted sum of four terms.  The first two are the initial condition (evaluated at `(T_initial, X_initial)`) and the Dirichlet boundary condition (evaluated at `(T_dirichlet, X_dirichlet)`), as implemented by:
+
+```
+def loss_dirichlet(t, x, u_desired):
+    ''' Evaluate the initial condition or Dirichlet boundary condition (both are "fixed u" conditions), ie
+    sum_over(t, x)(|u - u_desired|^2) / number_of_(t, x)_points, where u is given by the NN model
+    '''
+    u_vals = tf.reshape(model(tf.stack([t, x], 1)), [len(t)]) # "model" is the NN predicted value, given (t, x)
+    return tf.reduce_mean(tf.square(u_vals - u_desired))
+```
+
+The third is the Neumann condition (evaluated at `(T_neumann, X_neumann)`):
+
+```
+def loss_neumann(t, x, flux_desired):
+    ''' Evaluate the Neumann boundary condition, ie
+    sum_over(t, x)(|du/dx - flux_desired|^2) / number_of_(t, x)_points, where u is given by the NN model
+    '''
+    # First, use TensorFlow automatic differentiation to evaluate du/dx, at the points (t, x), where u is given by the NN model
+    with tf.GradientTape(persistent = True) as tp:
+        tp.watch(x)
+        u = model(tf.stack([t, x], 1)) # "model" is the NN predicted value, u, given (t, x)
+    u_x = tp.gradient(u, x)
+    del tp
+    # Now return the loss
+    return tf.reduce_mean(tf.square(u_x - flux_desired))
+```
+
+The fourth term is the advection equation (evaluated at `(T_interior, X_interior)`):
+
+```
+def loss_de(t, x):
+    ''' Returns sum_over_(t, x)(|du/dt + velocity * du/dx|^2) / number_of_(t, x)_points
+    '''
+    # First, use TensorFlow automatic differentiation to evaluate du/dt and du/dx, at the points (t, x), where u is given by the NN model
+    with tf.GradientTape(persistent = True) as tp:
+        tp.watch(t)
+        tp.watch(x)
+        u = model(tf.stack([t, x], 1)) # "model" is the NN predicted value, u, given (t, x)
+    u_t = tp.gradient(u, t)
+    u_x = tp.gradient(u, x)
+    del tp
+    # The loss is just the mean-squared du/dt + velocity * du/dx
+    return tf.reduce_mean(tf.square(u_t + velocity * u_x))
+```
+
+These four terms contribute to the overall loss function:
+
+```
+@tf.function # decorate for speed
+def loss(ytrue, ypred):
+    ''' The loss used by the training algorithm.  Note that ytrue and ypred are not used,
+    but TensorFlow specifies these arguments
+    '''
+    weight_initial = 1
+    weight_dirichlet = 1
+    weight_neumann = 1
+    weight_de = 1
+    return weight_initial * loss_dirichlet(T_initial, X_initial, vals_initial) + weight_dirichlet * loss_dirichlet(T_dirichlet, X_dirichlet, vals_dirichlet) + weight_neumann * loss_neumann(T_neumann, X_neumann, flux_neumann) + weight_de * loss_de(T_interior, X_interior)
+```
+
+Now it is simply a matter of compiling the neural network specifying this loss function, and training in the usual way:
+
+```
+    model.compile(loss = loss, optimizer = 'adam') # note the specification of the loss function
+    # Note that the dummy values are not used in the training because the loss function uses different arguments.
+    dummy_tx = [[0, 0]]
+    dummy_true = [0]
+    history = model.fit(dummy_tx, dummy_true, epochs = epochs, batch_size = batch_size, verbose = 1)
+```
+
+The results are pleasing!
+
+![Animated PINN solution](advection.gif)
 
