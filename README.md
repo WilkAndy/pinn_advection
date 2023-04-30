@@ -275,9 +275,14 @@ The results are pleasing!
 
 ![Animated PINN solution](advection.gif)
 
-## Comments
+## Comments/Questions
 
 - Obviously, the boundary conditions need not be at the boundary, and these could be experimental measurements of some quantity.
 - Is the PINN approach any better (computationally cheaper, more accurate, more robust) than: (a) finite-element; (b) using something else like a bunch of radial basis functions?
 - In some cases, an explicit time-stepping approach is advantageous to ensure robustness.  Would the PINN approach that is solving "everything, everywhere, all at once" actually work?
+- Could adaptive positioning of the points reduce computational time?
+- How is something like mass conservation implemented?
+- How about known fluxes (from an injector inside the domain, or from the boundary) - can randomly-placed points really ensure the correct total flux?
+- Could PINNs be re-jigged to do explicit time-stepping?
+
 
