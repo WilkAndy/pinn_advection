@@ -27,7 +27,7 @@ $$
 B(u) = 0
 $$
 
-For instance, in the heat equation case, a uniform $u - 293 = 0$ might be the initial condition, and $\nabla_{n} u - 1 = 0$ might be prescribed on the boundaries (here $n$ is the normal to the boundary, and physically this means that the boundaries are providing a source of heat).  It is assumed that there is a unique solution to this physical setup.
+For instance, in the heat equation case, a uniform $u - 293 = 0$ might be the initial condition, and $\nabla_{n} u - 1 = 0$ might be prescribed on the boundaries (here $n$ is the normal to the boundary, and physically this means that the boundaries are providing a source of heat).  It is assumed that there is a unique solution to this physical setup, and that it is well-posed.
 
 The PINN approach builds a standard neural network that outputs $u$, given space-time coordinates.  What is unique in the PINN approach is that the loss function is
 
@@ -35,9 +35,9 @@ $$
 \mathrm{Loss} = a |N(u)| + b |B(u)|
 $$
 
-Here the $|\cdot|$ notation indicates some norm.  For instance, $|N(u)| = \sum_{t, x}|N(u(t, x))|^{2}$, where the sum runs over some points in the interior of the space-time domain.  Similarly, $|B(u)| = \sum_{t_{\ast}, x_{\ast}}|B(u(t_{\ast}, x_{\ast}))|^{2}$, where the sum runs over some points on the boundary of the space-time domain.  Note the fundamental difference with usual neural networks: *the loss depends on derivatives of the neural network's output value with respect to its input values*.  These derivatives are calculated using automatic differentiation.
+Here the $|\cdot|$ notation indicates some norm.  For instance, $|N(u)| = \mathrm{mean}_{t, x}|N(u(t, x))|^{2}$, where the mean is taken over some points in the interior of the space-time domain.  Similarly, $|B(u)| = \mathrm{mean}_{t_{\ast}, x_{\ast}}|B(u(t_{\ast}, x_{\ast}))|^{2}$, where the mean is taken over some points on the boundary of the space-time domain.  Note the fundamental difference with usual neural networks: *the loss depends on derivatives of the neural network's output value with respect to its input values*.  These derivatives are calculated using automatic differentiation.
 
-The remainder of the PINN approach appears to be just gloss (albeit, very important gloss that may critically influence convergence).  The critical point is that the loss function is unusual.
+The remainder of the PINN approach appears to be just "gloss".  This "gloss" may critically influence convergence in many cases, so may be practically vital, but it is not the focus of this page.  For instance, Raissi, Perdikaris and Karniadakis use automatic differentiation to find the derivatives of the neural network with respect to its internal parameters (biases and weights) and hence use a Newton method to converge.  However, this "gloss" is not the focus of this page: the critical point is that the loss function is unusual.
 
 ## The advection equation
 
