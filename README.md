@@ -4,6 +4,8 @@
 
 Physics-informed neural networks (PINNs) were [introduced](https://www.sciencedirect.com/science/article/pii/S0021999118307125) by Raissi, Perdikaris and Karniadakis in 2019, as a method of finding numerical solutions to continuous and discrete-time partial differential equations, as well as parameterising those equations using data.  In this repository, I want to concentrate on the case of finding a numerical solution to the continuous-time advection equation.  No doubt this has been done my many other authors, but I'm trying to teach myself!
 
+Towards the end of this page, I outline the other features of Raissi, Perdikaris and Karniadakis's work, namely [Discrete time integration via Runge-Kutta](#custom_anchor_name)
+
 ## Required packages
 
 Python with [TensorFlow](https://www.tensorflow.org/) is used to solve the PINNs in this repository.  To run the python scripts, `matplotlib` and `tensorflow` are needed.  Install them using, for instance,
@@ -35,7 +37,7 @@ $$
 \mathrm{Loss} = a |N(u)| + b |B(u)|
 $$
 
-Here the $|\cdot|$ notation indicates some norm.  For instance, $|N(u)| = \mathrm{mean}_{t, x}|N(u(t, x))|^{2}$, where the mean is taken over some points in the interior of the space-time domain.  Similarly, $|B(u)| = \mathrm{mean}_{t_{\ast}, x_{\ast}}|B(u(t_{\ast}, x_{\ast}))|^{2}$, where the mean is taken over some points on the boundary of the space-time domain.  Note the fundamental difference with usual neural networks: *the loss depends on derivatives of the neural network's output value with respect to its input values*.  These derivatives are calculated using automatic differentiation.
+Here the $|\cdot|$ notation indicates some norm.  For instance, $|N(u)| = \mathrm{mean} |N(u(t, x))|^{2}$, where the mean is taken over some points in the interior of the space-time domain.  Similarly, $|B(u)| = \mathrm{mean} {}_{t_{\ast}, x_{\ast}}|B(u(t_{\ast}, x_{\ast}))|^{2}$, where the mean is taken over some points on the boundary of the space-time domain.  Note the fundamental difference with usual neural networks: *the loss depends on derivatives of the neural network's output value with respect to its input values*.  These derivatives are calculated using automatic differentiation.
 
 The remainder of the PINN approach appears to be just "gloss".  This "gloss" may critically influence convergence in many cases, so may be practically vital, but it is not the focus of this page.  For instance, Raissi, Perdikaris and Karniadakis use automatic differentiation to find the derivatives of the neural network with respect to its internal parameters (biases and weights) and hence use a Newton method to converge.  However, this "gloss" is not the focus of this page: the critical point is that the loss function is unusual.
 
@@ -285,4 +287,6 @@ The results are pleasing!
 - How about known fluxes (from an injector inside the domain, or from the boundary) - can randomly-placed points really ensure the correct total flux?
 - Could PINNs be re-jigged to do explicit time-stepping?
 
+<a name="custom_anchor_name"></a>
+## Discrete time integration
 
