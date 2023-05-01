@@ -4,7 +4,7 @@
 
 Physics-informed neural networks (PINNs) were [introduced](https://www.sciencedirect.com/science/article/pii/S0021999118307125) by Raissi, Perdikaris and Karniadakis in 2019, as a method of finding numerical solutions to continuous and discrete-time partial differential equations, as well as parameterising those equations using data.  In this repository, I want to concentrate on the case of finding a numerical solution to the continuous-time advection equation.  No doubt this has been done my many other authors, but I'm trying to teach myself!
 
-Towards the end of this page, I outline the other features of Raissi, Perdikaris and Karniadakis's work, namely [Discrete time integration via Runge-Kutta](#rungekutta)
+Towards the end of this page, I outline the other features of Raissi, Perdikaris and Karniadakis's work, namely [discrete time integration via Runge-Kutta](#rungekutta) and [parameter identification](#paramid)
 
 ## Required packages
 
@@ -279,10 +279,10 @@ The results are pleasing!
 
 ## Comments/Questions
 
-- Obviously, the boundary conditions need not be at the boundary, and these could be experimental measurements of some quantity.
+- Obviously, the boundary conditions need not be at the boundary, and these could be experimental measurements of some quantity.  This is related to [parameter identification](#paramid)
 - Is the PINN approach any better (computationally cheaper, more accurate, more robust) than: (a) finite-element; (b) using something else like a bunch of radial basis functions?
-- In some cases, an explicit time-stepping approach is advantageous to ensure robustness.  Would the PINN approach that is solving "everything, everywhere, all at once" actually work?
-- Could adaptive positioning of the points reduce computational time?
+- In some cases, an explicit time-stepping approach is advantageous to ensure robustness.  Would the PINN approach that is solving "everything, everywhere, all at once" actually work?  This is related to [discrete time integration](#rungekutta)
+- Could adaptive positioning of the points reduce computational time and/or increase robustness and/or increase accuracy?
 - How is something like mass conservation implemented?
 - How about known fluxes (from an injector inside the domain, or from the boundary) - can randomly-placed points really ensure the correct total flux?
 - Could PINNs be re-jigged to do explicit time-stepping?   [Yes!](#rungekutta)
@@ -335,6 +335,23 @@ $$
 In this formula, the spatio-temporal dependencies have been mostly supressed for clarity of exposition, and the "mean" runs over all spatial points that are chosen randomly within the domain, as in the advection-equation example.  The "bdy" term in the Loss function are from boundary conditions.  Because the outputs of the neural network, $u^{(i)}$ and $u(t + \Delta t)$ are all approximations to the temporal evolution of $u$, they are all subject to the same boundary conditions as $u$.
 
 The rather dramatic consequence of this scheme is that the number of Runge-Kutta stages, $q$, can be taken rather large (Raissi, Perdikaris and Karniadakis use $q=100$ and estimate their error to be $10^{-20}$) without the usual increase in computational burden: only the final layer of the neural network increases in size.  Employing an implicit method (the $a$ matrix is not lower-triangular) in the traditional setting requires a dense linear solve at each point $x$ (which, for nonlinear systems, $S$, also occurs within an interative nonlinear Newton method), and this is computationally expensive, but in the PINN setting, this computational burden appears to be by-passed.  This means that implicit RK schemes can be used.  Using so-called Gauss-Legendre implicit schemes produces an A-stable result, so allow large time-steps to be used!
+
+<a name="paramid"></a>
+## Parameter identification
+
+When the DE contains unknown parameters, $\lambda_{a}$, and there are experimentally-measured data (that may be noisy), the unknown parameters may be identified by ensuring the neural network's output matches the data as closely as possible.  This is achieved by including further terms in the loss function:
+
+$$
+\mathrm{Loss} = \ldots + \sum_{\mathrm{obs}} a_{\mathrm{obs}}|u(t_{\mathrm{obs}}, x_{\mathrm{obs}}) - u_{\mathrm{obs}}|^{2}
+$$
+
+Here, $\ldots$ is the previously-discussed term involving the PDE, $a_{o}$ is a weight for each experimental observation, $u_{\mathrm{obs}}$ is the observation taken at $(t_{\mathrm{obs}}, x_{\mathrm{obs}})$, and $u$ is the value produced by the neural network.
+
+As an aside, the $\ldots$ could presumably involve the PDE and boundary conditions evaluated at a number of arbitrary points, but Raissi, Perdikaris and Karniadakis only consider the case where $\ldots$ contains only the PDE evaluated at the points $(t_{\mathrm{obs}}, x_{\mathrm{obs}})$, presumably taking the view that boundary conditions are a type of measurement, so are included in the $\sum_{\mathrm{obs}}$ terms already.
+
+The neural network is trained by finding the optimal paramters in this problem, which are the neural network weights and biases and the $\lambda_{a}$.  A steepest-descent, for instance, could be implemented by evaluating $\partial\mathrm{Loss}/\partial\mathrm{weight}$ and $\partial\mathrm{Loss}/\partial\lambda$.  The former involves $\partial u/\partial\mathrm{weight}$ (which can be evaluated using automatic differentiation), while the latter involves $\partial \mathrm{PDE}/\partial\lambda$, again easily evaluated.
+
+
 
 
 
