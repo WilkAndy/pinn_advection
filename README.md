@@ -4,7 +4,7 @@
 
 Physics-informed neural networks (PINNs) were [introduced](https://www.sciencedirect.com/science/article/pii/S0021999118307125) by Raissi, Perdikaris and Karniadakis in 2019, as a method of finding numerical solutions to continuous and discrete-time partial differential equations, as well as parameterising those equations using data.  In this repository, I want to concentrate on the case of finding a numerical solution to the continuous-time advection equation.  No doubt this has been done my many other authors, but I'm trying to teach myself!
 
-Towards the end of this page, I outline the other features of Raissi, Perdikaris and Karniadakis's work, namely [Discrete time integration via Runge-Kutta](#custom_anchor_name)
+Towards the end of this page, I outline the other features of Raissi, Perdikaris and Karniadakis's work, namely [Discrete time integration via Runge-Kutta](#rungekutta)
 
 ## Required packages
 
@@ -19,9 +19,9 @@ conda install -c conda-forge matplotlib
 
 The approach assumes that the dynamics of a system are described by a differential equation
 
-##
+$$
 N(u) = 0
-##
+$$
 
 Here, $N$ is a differential operator, which is possibly nonlinear, and $u$ describes the system.  For instance, if $u$ represents temperature of a system, then $N$ might be the heat equation: $\mathrm{d}u/\mathrm{d}t = k\nabla^{2}u$.  The solution of $N(u)=0$ also depends on initial and boundary conditions
 
@@ -37,7 +37,7 @@ $$
 \mathrm{Loss} = a |N(u)| + b |B(u)|
 $$
 
-Here the $|\cdot|$ notation indicates some norm.  For instance, $|N(u)| = \mathrm{mean} |N(u(t, x))|^{2}$, where the mean is taken over some points in the interior of the space-time domain.  Similarly, $|B(u)| = \mathrm{mean} {}_{t_{\ast}, x_{\ast}}|B(u(t_{\ast}, x_{\ast}))|^{2}$, where the mean is taken over some points on the boundary of the space-time domain.  Note the fundamental difference with usual neural networks: *the loss depends on derivatives of the neural network's output value with respect to its input values*.  These derivatives are calculated using automatic differentiation.
+Here the $|\cdot|$ notation indicates some norm.  For instance, $|N(u)| = \mathrm{mean} |N(u(t, x))|^{2}$, where the mean is taken over some points in the interior of the space-time domain.  Similarly, $|B(u)| = \mathrm{mean} |B(u(t_{\ast}, x_{\ast}))|^{2}$, where the mean is taken over some points on the boundary of the space-time domain (denoted with an asterisk).  Note the fundamental difference with usual neural networks: *the loss depends on derivatives of the neural network's output value with respect to its input values*.  These derivatives are calculated using automatic differentiation.
 
 The remainder of the PINN approach appears to be just "gloss".  This "gloss" may critically influence convergence in many cases, so may be practically vital, but it is not the focus of this page.  For instance, Raissi, Perdikaris and Karniadakis use automatic differentiation to find the derivatives of the neural network with respect to its internal parameters (biases and weights) and hence use a Newton method to converge.  However, this "gloss" is not the focus of this page: the critical point is that the loss function is unusual.
 
@@ -285,8 +285,59 @@ The results are pleasing!
 - Could adaptive positioning of the points reduce computational time?
 - How is something like mass conservation implemented?
 - How about known fluxes (from an injector inside the domain, or from the boundary) - can randomly-placed points really ensure the correct total flux?
-- Could PINNs be re-jigged to do explicit time-stepping?
+- Could PINNs be re-jigged to do explicit time-stepping?   [Yes!](#rungekutta)
 
-<a name="custom_anchor_name"></a>
+<a name="rungekutta"></a>
 ## Discrete time integration
+
+Suppose that the dynamics of a system are described by the differential equation
+
+$$
+\frac{\partial u}{\partial t} + S(u) = 0
+$$
+
+Here $S$ is a differential operator, which is possibility nonlinear, that involves spatial derivatives only.  Given $u(t, x)$, this section finds $u(t + \Delta t, x)$ for a given $\Delta t$.
+
+The usual fourth-order explicit [Runge-Kutta](https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods) scheme for integrating this is as follows.  Given $u(t, x)$, define four spatially-dependent functions $u^{(1)}$, $u^{(2)}$, $u^{(3)}$ and $u^{(4)}$ by:
+
+$$
+\begin{array}{rcl}
+u^{(1)}(t, x) & = & u(t, x) \\
+u^{(2)}(t + \frac{1}{2}\Delta t, x) & = & u(t, x) - \frac{1}{2} \Delta t\times S(u^{(1)}(t, x)) \\
+u^{(3)}(t + \frac{1}{2}\Delta t, x) & = & u(t, x) - \frac{1}{2} \Delta t\times S(u^{(2)}(t + \frac{1}{2}\Delta t, x)) \\
+u^{(4)}(t + \Delta t, x) & = & u(t, x) - \Delta t \times S(u^{(3)}(t + \frac{1}{2}\Delta t, x))
+\end{array}
+$$
+
+Then
+
+$$
+u(t + \Delta t, x) = u(t, x) - \Delta t \left[\frac{1}{6}S\left(u^{(1)}(t, x)\right) + \frac{1}{3}S\left(u^{(2)}(t + \frac{1}{2}\Delta t, x)\right) + \frac{1}{3}S\left(u^{(3)}(t + \frac{1}{2}\Delta t, x)\right) + \frac{1}{6}S\left(u^{(4)}(t + \Delta t, x)\right) \right]
+$$
+
+In these expressions, the coefficients $1/2$, $1/3$, and $1/6$ are coefficients of the "Butcher tableau" for this fourth-order scheme.  The more general Runge-Kutta scheme with $q$ levels that can be either explicit or implicit (depending on the coefficients in the Butcher tableau) is written
+
+$$
+\begin{array}{rcl}
+u^{(i)}(t + c_{i}\Delta t, x) & = & u(t, x) - \Delta t\sum a_{ij} S\left(u^{(j)}(t + c_{j}\Delta t, x) \right) \\
+u(t + \Delta t, x) & = & u(t, x) - \Delta t \sum b_{j} S\left(u^{(j)}(t + c_{j}\Delta t, x)\right)
+\end{array}
+$$
+
+Here $i = 1, \ldots , q$, and the sum runs over $j = 1, \ldots , q$.
+
+The simple, yet revolutionary idea of Raissi, Perdikaris and Karniadakis is to build a neural network that has input $x$ (which is a d-dimensional tuple for a problem with $d$ spatial dimensions) and $q + 1$ outputs that are $u^{(i)}(t + c_{i}\Delta t)$ and $u(t + \Delta t)$.  The loss function enforces the above equations:
+
+$$
+\mathrm{Loss} = \mathrm{mean}\left\\{ \left( u(t + \Delta t) + \sum_{j=1}^{q}b_{j} S(u^{(j)}) - u(t) \right)^{2} + \sum_{i=1}^{q} \left(u^{(i)} + \Delta t \sum_{j=1}^{q}a_{ij} S(u^{(j)}) - u(t)\right)^{2} \right\\} + \mathrm{bdy}
+$$
+
+In this formula, the spatio-temporal dependencies have been mostly supressed for clarity of exposition, and the "mean" runs over all spatial points that are chosen randomly within the domain, as in the advection-equation example.  The "bdy" term in the Loss function are from boundary conditions.  Because the outputs of the neural network, $u^{(i)}$ and $u(t + \Delta t)$ are all approximations to the temporal evolution of $u$, they are all subject to the same boundary conditions as $u$.
+
+The rather dramatic consequence of this scheme is that the number of Runge-Kutta stages, $q$, can be taken rather large (Raissi, Perdikaris and Karniadakis use $q=100$ and estimate their error to be $10^{-20}$) without the usual increase in computational burden: only the final layer of the neural network increases in size.  Employing an implicit method (the $a$ matrix is not lower-triangular) in the traditional setting requires a dense linear solve at each point $x$ (which, for nonlinear systems, $S$, also occurs within an interative nonlinear Newton method), and this is computationally expensive, but in the PINN setting, this computational burden appears to be by-passed.  This means that implicit RK schemes can be used.  Using so-called Gauss-Legendre implicit schemes produces an A-stable result, so allow large time-steps to be used!
+
+
+
+
+
 
