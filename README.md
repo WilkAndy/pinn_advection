@@ -37,7 +37,11 @@ $$
 \mathrm{Loss} = a |N(u)| + b |B(u)|
 $$
 
-Here the $|\cdot|$ notation indicates some norm.  For instance, $|N(u)| = \mathrm{mean} |N(u(t, x))|^{2}$, where the mean is taken over some points in the interior of the space-time domain.  Similarly, $|B(u)| = \mathrm{mean} |B(u(t_{\ast}, x_{\ast}))|^{2}$, where the mean is taken over some points on the boundary of the space-time domain (denoted with an asterisk).  Note the fundamental difference with usual neural networks: *the loss depends on derivatives of the neural network's output value with respect to its input values*.  These derivatives are calculated using automatic differentiation.
+Here the $|\cdot|$ notation indicates some norm.  For instance, $|N(u)| = \mathrm{mean} |N(u(t, x))|^{2}$, where the mean is taken over some points in the interior of the space-time domain.  Similarly, $|B(u)| = \mathrm{mean} |B(u(t_{\ast}, x_{\ast}))|^{2}$, where the mean is taken over some points on the boundary of the space-time domain (denoted with an asterisk).  Note the fundamental difference with usual neural networks: *the loss depends on derivatives of the neural network's output value with respect to its input values*.
+
+These derivatives are calculated using automatic differentiation.  It is easy to differentiate a single activation function with respect to its input.  Automatic differentiation is just doing that derivative, and using heaps of chain rules to propagate the differential operator through the entire neural network.  So, automatic differentiation can easily give $N(u)$, given $(t, x)$.
+
+An alternate view of this is that the (automatic) differentiation of the original neural network gives another neural network: one that outputs $N$, given $(t, x)$, for instance.  Then that new neural network is provided with a standard loss function that enforces N = output = 0.
 
 The remainder of the PINN approach appears to be just "gloss".  This "gloss" may critically influence convergence in many cases, so may be practically vital, but it is not the focus of this page.  For instance, Raissi, Perdikaris and Karniadakis use automatic differentiation to find the derivatives of the neural network with respect to its internal parameters (biases and weights) and hence use a Newton method to converge.  However, this "gloss" is not the focus of this page: the critical point is that the loss function is unusual.
 
@@ -347,7 +351,7 @@ $$
 
 Here, $\ldots$ is the previously-discussed term involving the PDE, $a_{o}$ is a weight for each experimental observation, $u_{\mathrm{obs}}$ is the observation taken at $(t_{\mathrm{obs}}, x_{\mathrm{obs}})$, and $u$ is the value produced by the neural network.
 
-As an aside, the $\ldots$ could presumably involve the PDE and boundary conditions evaluated at a number of arbitrary points, but Raissi, Perdikaris and Karniadakis only consider the case where $\ldots$ contains only the PDE evaluated at the points $(t_{\mathrm{obs}}, x_{\mathrm{obs}})$, presumably taking the view that boundary conditions are a type of measurement, so are included in the $\sum_{\mathrm{obs}}$ terms already.
+As an aside, the $\ldots$ could presumably involve the PDE and boundary conditions evaluated at a number of arbitrary points, but Raissi, Perdikaris and Karniadakis only consider the case where $\ldots$ contains just the PDE evaluated at the points $(t_{\mathrm{obs}}, x_{\mathrm{obs}})$, presumably taking the view that boundary conditions are a type of measurement, so are included in the $\sum_{\mathrm{obs}}$ terms already.
 
 The neural network is trained by finding the optimal paramters in this problem, which are the neural network weights and biases and the $\lambda_{a}$.  A steepest-descent, for instance, could be implemented by evaluating $\partial\mathrm{Loss}/\partial\mathrm{weight}$ and $\partial\mathrm{Loss}/\partial\lambda$.  The former involves $\partial u/\partial\mathrm{weight}$ (which can be evaluated using automatic differentiation), while the latter involves $\partial \mathrm{PDE}/\partial\lambda$, again easily evaluated.
 
