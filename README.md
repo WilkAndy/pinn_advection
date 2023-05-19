@@ -302,12 +302,12 @@ The results are pleasing!
 
 When the DE contains unknown parameters, $\lambda_{a}$, and there are experimentally-measured data (that may be noisy), the unknown parameters may be identified by ensuring the neural network's output matches the data as closely as possible.  This is known as the "inverse problem".  Some real-life examples are:
 
-- In groundwater models, the speed of groundwater flow is governed by a parameter called "hydraulic conductivity" ($\lambda$ is hydraulic conductivity)  For instance, a blob of sandstone usually has high conductivity, while a blob of clay usually has low conductivity.  Water can easily pass rapidly through the sand, but moves only very slowly through the clay.  Imagine the situation where groundwater head has been measured at various times and places throughout a body of rock that contains a patchwork of sandstone and clay blobs.  The inverse problem is to use those measurements to infer the spatial distribution of hydraulic conductivity, that is, to determine where the sandstone and clay blobs are.
-- Populations of mosquitoes are often prescribed a "carrying capacity" ($\lambda$ is carrying capacity), which is the number of mosquitoes when things are in equilibrium (eg, after many generations of breeding and dying).  If the carrying capacity is large, then the mosquito population can grow large, while if the carrying capacity is small, the mosquito population is limited to a small number.  Carrying capacity varies in time.  For instance in wet, summers in Africa, the carrying capacity is large, while in dry, cool winters it is low.  Carrying capacity also varies in space.  For instance, near to population centres with plentiful standing water, the carrying capacity is large, while in the desert, it is small.  The population is dynamic and rarely (or never) achieves it's theoretical equilibrium at the carrying capacity.  Imagine the situation where mosquito numbers have been measured at various times and places throughout a landscape.  The inverse problem is to find the carrying capacity as a function of time and space given those observations.
+- In groundwater models, the speed of groundwater flow is governed by a parameter called "hydraulic conductivity" ($\lambda$ is hydraulic conductivity).  For instance, a blob of sandstone usually has high conductivity, while a blob of clay usually has low conductivity.  Water can pass rapidly through the sand, but moves only very slowly through the clay.  Imagine the situation where groundwater head ($u$) has been measured at various times and places throughout a body of rock that contains a patchwork of sandstone and clay blobs.  The inverse problem is to use those measurements to infer the spatial distribution of hydraulic conductivity, that is, to determine where the sandstone and clay blobs are.
+- Populations of mosquitoes are often prescribed a "carrying capacity" ($\lambda$ is carrying capacity), which is the number of mosquitoes when things are in equilibrium (eg, after many generations of breeding and dying).  If the carrying capacity is large, then the mosquito population can grow large, while if the carrying capacity is small, the mosquito population is limited to a small number.  Carrying capacity varies in time.  For instance, in wet summers in Africa, the carrying capacity is large, while in dry winters it is low.  Carrying capacity also varies in space.  For instance, near to population centres with plentiful standing water, the carrying capacity is large, while in the desert, it is small.  The population is dynamic and rarely (or never) achieves it's theoretical equilibrium at the carrying capacity.  Imagine the situation where mosquito numbers ($u$) have been measured at various times and places throughout a landscape.  The inverse problem is to find the carrying capacity as a function of time and space given those observations.
 
-In both these problems, the underyling DE is assumed to be known, but it contains one or more unknown parameters, $\lambda_{a}$.  For instance, groundwater head (the thing that is observed) is governed by the diffusion equation with diffusivity related to hydraulic conductivity.  Mosquito populations are usually governed by complicated DEs, but the simplest is the logistic equation that contains the carrying capacity as its main parameter.  In both of these problems, the object that is measured (groundwater head or mosquito population) $u$, is not the what is desired (conductivity or carrying capacity) $\lambda$, but they are related.
+In both these problems, the underyling DE is assumed to be known, but it contains one or more unknown parameters, $\lambda_{a}$.  For instance, groundwater head (the thing that is observed, $u$) is governed by the diffusion equation with diffusivity related to hydraulic conductivity.  Mosquito populations ($u$) are usually governed by complicated DEs, but the simplest is the logistic equation that contains the carrying capacity as its main parameter.  In both of these problems, the object that is measured (groundwater head or mosquito population, $u$), is not the what is desired (conductivity or carrying capacity, $\lambda$) but they are related.
 
-To solve the inverse problem, further terms in the loss function:
+To solve the inverse problem, further terms are added to the loss function:
 
 $$
 \mathrm{Loss} = \ldots + \sum_{\mathrm{obs}} a_{\mathrm{obs}}|u(t_{\mathrm{obs}}, x_{\mathrm{obs}}) - u_{\mathrm{obs}}|^{2}
@@ -315,12 +315,169 @@ $$
 
 Here, $\ldots$ is the previously-discussed term involving the PDE, $a_{o}$ is a weight for each experimental observation, $u_{\mathrm{obs}}$ is the observation taken at $(t_{\mathrm{obs}}, x_{\mathrm{obs}})$, and $u$ is the value produced by the neural network.
 
-The neural network is trained by finding the optimal paramters in this problem, which are the neural network weights and biases and the $\lambda_{a}$.  The standard method of achieving this appears to be steepest-descent, which relies on evaluating $\partial\mathrm{Loss}/\partial\mathrm{weight}$ and $\partial\mathrm{Loss}/\partial\lambda$.  These are evaluated using automatic differentiation, as explained fully in the next section
+The neural network is trained by finding the optimal paramters in this problem, which are the neural network weights and biases and the $\lambda_{a}$.  The standard method of achieving this appears to be steepest-descent, which relies on evaluating $\partial\mathrm{Loss}/\partial\mathrm{weight}$ and $\partial\mathrm{Loss}/\partial\lambda$.  These are evaluated using automatic differentiation, as explained fully in the next section.
+
+In summary, the procedure described below will:
+
+- find the unknown advection velocity, given some observational data
+- solve the advection equation to find $u = u(t, x)$.
 
 ## Explicit example of the inverse advection problem
 
-TODO
+### Generating some observational data
 
+Because the solution of the advection equation is known, as described above, observational data can be easily generated.  The code is [observations.py](observations.py).  No noise is added in this example:
+
+```
+velocity = 1.2 # the true velocity, that will be discovered, hopefully, by the inverse process
+
+def front(x):
+    window = 0.2
+    return tf.where(x <= -1, 1, tf.where(x >= -1 + 2 * window, 0, 0.5 + (x + 1 - window) * (tf.pow(x + 1 - window, 2) - 3 * tf.pow(window, 2)) / 4 / tf.pow(window, 3)))
+
+num_points = 10000
+X = tf.random.uniform(shape = [num_points], minval = -1, maxval = 1, dtype = tf.float32).numpy()
+T = tf.random.uniform(shape = [num_points], minval = 0, maxval = 1, dtype = tf.float32).numpy()
+u = front(X - velocity * T).numpy() # the solution to the advection equation
+with open("observations.csv", "w") as f:
+    f.write("#true velocity = " + str(velocity) + "\n")
+    f.write("T,X,u\n")
+    for pt in range(num_points):
+        f.write(str(T[pt]) + "," + str(X[pt]) + "," + str(u[pt]) + "\n")
+```
+
+### Training a neural network to solve the advection equation and find the unknown advection velocity
+
+The code may be found in [inverse.py](inverse.py).  It is actually very similar to [advection.py](advection.py), but to minimise the loss, the derivatives with respect to the unknown velocity are needed (so that gradient descent can be used to modify the velocity (and neural net weights and biases) to minimise the loss).  This necessitates explicitly defining the weights and biases and the neural network architecture, as well as the gradient-descent.  Hence, things like
+
+```
+    model = Sequential()
+    model.add(Dense(...))
+    model.fit(...)
+```
+
+expand to many lines of code.
+
+First, `velocity` is now an unknown variable, so it is defined and initialised using
+
+```
+velocity = tf.Variable(0.5, dtype = tf.float32) # advection velocity with initial guess = 0.5
+```
+
+The observations are read from file:
+
+```
+obs = pd.read_csv("observations.csv", comment = "#")
+T_obs = tf.constant(obs['T'], dtype = tf.float32)
+X_obs = tf.constant(obs['X'], dtype = tf.float32)
+vals_obs = tf.constant(obs['u'], dtype = tf.float32)
+```
+
+The various loss functions are the same as for the advection.py case, with `loss_dirichlet` being used to ensure the neural network output matches the observations:
+
+```
+def loss_dirichlet(t, x, u_desired):
+    ''' Evaluate the observations or Dirichlet boundary condition (both are "fixed u" conditions), ie
+    sum_over(t, x)(|u - u_desired|^2) / number_of_(t, x)_points, where u is given by the NN model
+    '''
+    u_vals = tf.reshape(model(tf.stack([t, x], 1)), [len(t)]) # "model" is the NN predicted value, given (t, x)
+    return tf.reduce_mean(tf.square(u_vals - u_desired))
+```
+
+The following rather large block of code defines the weights and biases as a whole lot of tf.Variables.  This is in contrast to advection.py, where their definition was hidden inside the lines `model = Sequential()` and `model.add(Dense(...))`.  The weights are Glorot initialised and the biases are initialised to zero.  The reason the weights and biases are explicitly defined is that later they'll appear in the explicit definition of the neural net.  They are also collected into the "params" list, which will appear in $d(\mathrm{loss})/d(\mathrm{params})$ that will be used in the gradient-descent algorithm.
+
+```
+depth = 5           # depth of NN
+width = 10          # width of fully-connected NN
+def glorot_init_weight(in_dim, out_dim):
+    return tf.Variable(tf.random.truncated_normal(shape = [in_dim, out_dim], mean = 0.0, stddev = np.sqrt(2.0 / (in_dim + out_dim)), dtype = tf.float32), dtype = tf.float32)
+def zero_init_bias(in_dim, out_dim):
+    return tf.Variable(tf.zeros(shape = [in_dim, out_dim], dtype = tf.float32), dtype = tf.float32)
+weights = [] # all the weights
+biases = [] # all the biases
+params = [] # all the weights and biases AND THE VELOCITY!
+# 2 inputs = (t, x)
+w = glorot_init_weight(2, width)
+b = zero_init_bias(1, width)
+weights.append(w)
+biases.append(b)
+params.append(w)
+params.append(b)
+for d in range(1, depth):
+    w = glorot_init_weight(width, width)
+    b = zero_init_bias(1, width)
+    weights.append(w)
+    biases.append(b)
+    params.append(w)
+    params.append(b)
+# 1 output =  u
+w = glorot_init_weight(width, 1)
+b = zero_init_bias(1, 1)
+weights.append(w)
+biases.append(b)
+params.append(w)
+params.append(b)
+```
+
+Now for a very important line, which is the whole reason for defining everything so explicitly:
+
+```
+params.append(velocity)
+```
+
+This means that the automatic differentiation used in $d(\mathrm{loss})/d(\mathrm{params})$ will include derivatives with respect to velocity.  This means the gradient descent will try to find the best velocity, which is the value that minimises the loss.
+
+The neural network can now be defined.  It explicitly uses the weights and biases that were just defined, so that $d(\mathrm{loss})/d(\mathrm{params})$ can be used in the gradient descent to find optimal values of the weights and biases.
+
+```
+def model(x):
+    # This uses the relu activation function.  relu(x) = max(x, 0)
+    # Some other alternatives like tanh, relu and softplus could be used
+    z = x
+    for d in range(depth):
+        w = weights[d]
+        b = biases[d]
+        zp = tf.add(tf.matmul(z, w), b)
+        #z = tf.math.log(1 + tf.math.exp(zp))          # softplus activation
+        #z = tf.math.tanh(zp)                          # tanh activation
+        #z = tf.where(zp > 0, zp, tf.math.exp(zp) - 1) # elu activation
+        z = tf.math.maximum(zp, 0)                     # relu activation
+    w = weights[depth]
+    b = biases[depth]
+    zp = tf.add(tf.matmul(z, w), b)
+    return tf.math.maximum(zp, 0) # might like to change this activation function if the hidden layers are also changed
+```
+
+The following piece of code does one step of the gradient descent.  Note the appearance of $d(\mathrm{loss})/d(\mathrm{params})$, which will mean the params (weights, biases and velocity) will be altered so as to reduce the loss.
+
+```
+optimizer = tf.keras.optimizers.Adam()
+@tf.function # decorate for speed
+def gradient_descent():
+    with tf.GradientTape(persistent = True) as tp:
+        epoch_loss = loss()
+    gradient = tp.gradient(epoch_loss, params) # d(loss)/d(params)
+    del tp
+    # because params includes weights, biases and velocity, the following line
+    # alters all of these to reduce the loss
+    optimizer.apply_gradients(zip(gradient, params))
+    return epoch_loss
+```
+
+The gradient descent is now simple:
+
+```
+epochs = 1000 # training epochs
+for epoch in range(epochs):
+    epoch_loss = gradient_descent()
+    print("epoch =", epoch, "loss =", epoch_loss.numpy(), "velocity =", velocity.numpy())
+```
+
+### Result
+
+After 1000 training epochs, the algorithm has predicted that velocity = 1.19 (the true value is 1.2) and it has produced a neural network that predicts $u(t, x)$ with little error.
+
+![Animated inverse PINN solution](inverse.gif)
 
 <a name="rungekutta"></a>
 ## Discrete time integration

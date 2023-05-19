@@ -20,7 +20,8 @@ import tensorflow as tf
 
 # note: velocity cannot be too large or too small, otherwise boundary conditions
 # will be violated
-velocity = 1.2 
+velocity = 2.5
+velocity_end = -1.5
 
 def front(x):
     ''' The shape of the front that is advected.  The return values could
@@ -40,10 +41,15 @@ num_points = 10000
 tmax = 1
 X = tf.random.uniform(shape = [num_points], minval = -1, maxval = 1, dtype = tf.float32).numpy()
 T = tf.random.uniform(shape = [num_points], minval = 0, maxval = tmax, dtype = tf.float32).numpy()
-u = front(X - velocity * T).numpy()
-with open("observations.csv", "w") as f:
+u = front(X - tf.where(T < 0.5, velocity * T, velocity * 0.5 + velocity_end * (T - 0.5))).numpy()
+with open("challenge.csv", "w") as f:
+    f.write("#true velocity is one unknown for t < 0.5 and another unknown for T >= 0.5\n")
     f.write("T,X,u\n")
     for pt in range(num_points):
         f.write(str(T[pt]) + "," + str(X[pt]) + "," + str(u[pt]) + "\n")
 
+import matplotlib.pyplot as plt
+plt.figure()
+plt.scatter(X, u)
+plt.show()
 sys.exit(0)
