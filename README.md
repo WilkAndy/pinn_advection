@@ -2,9 +2,14 @@
 
 ## Background
 
-Physics-informed neural networks (PINNs) were [introduced](https://www.sciencedirect.com/science/article/pii/S0021999118307125) by Raissi, Perdikaris and Karniadakis in 2019, as a method of finding numerical solutions to continuous and discrete-time partial differential equations, as well as parameterising those equations using data.  In this repository, I want to concentrate on the case of finding a numerical solution to the continuous-time advection equation.  No doubt this has been done my many other authors, but I'm trying to teach myself!
+Physics-informed neural networks (PINNs) were [introduced](https://www.sciencedirect.com/science/article/pii/S0021999118307125) by Raissi, Perdikaris and Karniadakis in 2019, as a method of finding numerical solutions to continuous and discrete-time partial differential equations, as well as parameterising those equations using data.  In this repository, I concentrate on
 
-Towards the end of this page, I outline the other features of Raissi, Perdikaris and Karniadakis's work, namely [discrete time integration via Runge-Kutta](#rungekutta) and [parameter identification](#paramid)
+- [finding a numerical solution to the continuous-time advection equation](#forward) (the "forward" problem);
+- [parameterising the advection equation using observations](#paramid) (the "inverse" problem)
+
+No doubt these have been done my many other authors, but I'm trying to teach myself!
+
+Towards the end of this page, I outline another feature of Raissi, Perdikaris and Karniadakis's work, namely [discrete time integration via Runge-Kutta](#rungekutta).  This appears to be startling novel and important, but I only summarise it here.
 
 ## Required packages
 
@@ -105,6 +110,7 @@ The following figure shows the result for $f(x) = \cos(x)$ and $u_{0} = 0.7$:
 
 ![Result of integrating a function](integrate.png)
 
+<a name="forward"></a>
 ## The advection equation
 
 The advection equation in 1 spatial dimension is
@@ -291,6 +297,31 @@ The results are pleasing!
 - How about known fluxes (from an injector inside the domain, or from the boundary) - can randomly-placed points really ensure the correct total flux?
 - Could PINNs be re-jigged to do explicit time-stepping?   [Yes!](#rungekutta)
 
+<a name="paramid"></a>
+## Parameter identification
+
+When the DE contains unknown parameters, $\lambda_{a}$, and there are experimentally-measured data (that may be noisy), the unknown parameters may be identified by ensuring the neural network's output matches the data as closely as possible.  This is known as the "inverse problem".  Some real-life examples are:
+
+- In groundwater models, the speed of groundwater flow is governed by a parameter called "hydraulic conductivity" ($\lambda$ is hydraulic conductivity)  For instance, a blob of sandstone usually has high conductivity, while a blob of clay usually has low conductivity.  Water can easily pass rapidly through the sand, but moves only very slowly through the clay.  Imagine the situation where groundwater head has been measured at various times and places throughout a body of rock that contains a patchwork of sandstone and clay blobs.  The inverse problem is to use those measurements to infer the spatial distribution of hydraulic conductivity, that is, to determine where the sandstone and clay blobs are.
+- Populations of mosquitoes are often prescribed a "carrying capacity" ($\lambda$ is carrying capacity), which is the number of mosquitoes when things are in equilibrium (eg, after many generations of breeding and dying).  If the carrying capacity is large, then the mosquito population can grow large, while if the carrying capacity is small, the mosquito population is limited to a small number.  Carrying capacity varies in time.  For instance in wet, summers in Africa, the carrying capacity is large, while in dry, cool winters it is low.  Carrying capacity also varies in space.  For instance, near to population centres with plentiful standing water, the carrying capacity is large, while in the desert, it is small.  The population is dynamic and rarely (or never) achieves it's theoretical equilibrium at the carrying capacity.  Imagine the situation where mosquito numbers have been measured at various times and places throughout a landscape.  The inverse problem is to find the carrying capacity as a function of time and space given those observations.
+
+In both these problems, the underyling DE is assumed to be known, but it contains one or more unknown parameters, $\lambda_{a}$.  For instance, groundwater head (the thing that is observed) is governed by the diffusion equation with diffusivity related to hydraulic conductivity.  Mosquito populations are usually governed by complicated DEs, but the simplest is the logistic equation that contains the carrying capacity as its main parameter.  In both of these problems, the object that is measured (groundwater head or mosquito population) $u$, is not the what is desired (conductivity or carrying capacity) $\lambda$, but they are related.
+
+To solve the inverse problem, further terms in the loss function:
+
+$$
+\mathrm{Loss} = \ldots + \sum_{\mathrm{obs}} a_{\mathrm{obs}}|u(t_{\mathrm{obs}}, x_{\mathrm{obs}}) - u_{\mathrm{obs}}|^{2}
+$$
+
+Here, $\ldots$ is the previously-discussed term involving the PDE, $a_{o}$ is a weight for each experimental observation, $u_{\mathrm{obs}}$ is the observation taken at $(t_{\mathrm{obs}}, x_{\mathrm{obs}})$, and $u$ is the value produced by the neural network.
+
+The neural network is trained by finding the optimal paramters in this problem, which are the neural network weights and biases and the $\lambda_{a}$.  The standard method of achieving this appears to be steepest-descent, which relies on evaluating $\partial\mathrm{Loss}/\partial\mathrm{weight}$ and $\partial\mathrm{Loss}/\partial\lambda$.  These are evaluated using automatic differentiation, as explained fully in the next section
+
+## Explicit example of the inverse advection problem
+
+TODO
+
+
 <a name="rungekutta"></a>
 ## Discrete time integration
 
@@ -339,22 +370,6 @@ $$
 In this formula, the spatio-temporal dependencies have been mostly supressed for clarity of exposition, and the "mean" runs over all spatial points that are chosen randomly within the domain, as in the advection-equation example.  The "bdy" term in the Loss function are from boundary conditions.  Because the outputs of the neural network, $u^{(i)}$ and $u(t + \Delta t)$ are all approximations to the temporal evolution of $u$, they are all subject to the same boundary conditions as $u$.
 
 The rather dramatic consequence of this scheme is that the number of Runge-Kutta stages, $q$, can be taken rather large (Raissi, Perdikaris and Karniadakis use $q=100$ and estimate their error to be $10^{-20}$) without the usual increase in computational burden: only the final layer of the neural network increases in size.  Employing an implicit method (the $a$ matrix is not lower-triangular) in the traditional setting requires a dense linear solve at each point $x$ (which, for nonlinear systems, $S$, also occurs within an interative nonlinear Newton method), and this is computationally expensive, but in the PINN setting, this computational burden appears to be by-passed.  This means that implicit RK schemes can be used.  Using so-called Gauss-Legendre implicit schemes produces an A-stable result, so allow large time-steps to be used!
-
-<a name="paramid"></a>
-## Parameter identification
-
-When the DE contains unknown parameters, $\lambda_{a}$, and there are experimentally-measured data (that may be noisy), the unknown parameters may be identified by ensuring the neural network's output matches the data as closely as possible.  This is achieved by including further terms in the loss function:
-
-$$
-\mathrm{Loss} = \ldots + \sum_{\mathrm{obs}} a_{\mathrm{obs}}|u(t_{\mathrm{obs}}, x_{\mathrm{obs}}) - u_{\mathrm{obs}}|^{2}
-$$
-
-Here, $\ldots$ is the previously-discussed term involving the PDE, $a_{o}$ is a weight for each experimental observation, $u_{\mathrm{obs}}$ is the observation taken at $(t_{\mathrm{obs}}, x_{\mathrm{obs}})$, and $u$ is the value produced by the neural network.
-
-As an aside, the $\ldots$ could presumably involve the PDE and boundary conditions evaluated at a number of arbitrary points, but Raissi, Perdikaris and Karniadakis only consider the case where $\ldots$ contains just the PDE evaluated at the points $(t_{\mathrm{obs}}, x_{\mathrm{obs}})$, presumably taking the view that boundary conditions are a type of measurement, so are included in the $\sum_{\mathrm{obs}}$ terms already.
-
-The neural network is trained by finding the optimal paramters in this problem, which are the neural network weights and biases and the $\lambda_{a}$.  A steepest-descent, for instance, could be implemented by evaluating $\partial\mathrm{Loss}/\partial\mathrm{weight}$ and $\partial\mathrm{Loss}/\partial\lambda$.  The former involves $\partial u/\partial\mathrm{weight}$ (which can be evaluated using automatic differentiation), while the latter involves $\partial \mathrm{PDE}/\partial\lambda$, again easily evaluated.
-
 
 
 
