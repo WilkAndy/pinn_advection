@@ -5,12 +5,13 @@
 Physics-informed neural networks (PINNs) were [introduced](https://www.sciencedirect.com/science/article/pii/S0021999118307125) by Raissi, Perdikaris and Karniadakis in 2019, as a method of finding numerical solutions to continuous and discrete-time partial differential equations, as well as parameterising those equations using data.  In this repository, I concentrate on
 
 - [finding a numerical solution to the continuous-time advection equation](#forward) (the "forward" problem);
-- [parameterising the advection equation using observations](#paramid) (the "inverse" problem)
+- [parameterising the advection equation using observations](#paramid) (the "inverse" problem).  There is a [challenge](#inv_challenge) for readers to solve!
 
 No doubt these have been done my many other authors, but I'm trying to teach myself!
 
 Towards the end of this page, I outline another feature of Raissi, Perdikaris and Karniadakis's work, namely [discrete time integration via Runge-Kutta](#rungekutta).  This appears to be startling novel and important, but I only summarise it here.
 
+<a name="req"></a>
 ## Required packages
 
 Python with [TensorFlow](https://www.tensorflow.org/) is used to solve the PINNs in this repository.  To run the python scripts, `matplotlib` and `tensorflow` are needed.  Install them using, for instance,
@@ -478,6 +479,37 @@ for epoch in range(epochs):
 After 1000 training epochs, the algorithm has predicted that velocity = 1.19 (the true value is 1.2) and it has produced a neural network that predicts $u(t, x)$ with little error.
 
 ![Animated inverse PINN solution](inverse.gif)
+
+<a name="inv_challenge"></a>
+### Challenge!
+
+Another set of observational data is found in [challenge.csv](challenge.csv).  In this set, there are *2 unknown advection velocities*:
+
+- the first velocity applies when $t < 0.5$
+- the second velocity applies when $t \geq 0.5$
+
+Can you find these velocities?
+
+You might like to approach this challenge by modifying [inverse.py](inverse.py).  First, try to run `inverse.py`: if you can't then check the [required packages](#req).  The code [inverse.py](inverse.py) can be modified in the following ways:
+
+1. Define a new `tf.Variable` called `velocity_end` that will be active for $t\geq 0.5$.  That is, add another line similar to `velocity = tf.Variable(0.5, dtype = tf.float32)`.
+2. Instead of reading the observations from `observations.csv`, use `challenge.csv` instead.  That is, change the line `obs = pd.read_csv("observations.csv", comment = "#")`.
+3. Change the PDE, specifically the PDE loss, to include `velocity_end` instead of just `velocity`.  That is, change the snippet `u_t + velocity * u_x` by using `tf.where(t < 0.5, ...)` instead of just `velocity`.
+4. Append `velocity_end` to the `params` list in a similar way to `params.append(velocity)`.
+5. At the end of each training iteration, print both `velocity` and `velocity_end`.  That is, add to the line `print("epoch =", epoch, "loss =", epoch_loss.numpy()...`.
+
+Now you should be able to run the code.  You'll probably find pretty poor results: look at the loss, particularly the observation loss, to see the algorithm hasn't converged particularly well.  Remember, the animation that is produced shows the PINN result correctly, but the "True" result (black curve) is from the previous case with just one velocity, so can be ignored.  To improve things, you might like to:
+
+- try more training epochs, for instance `epochs = 10000`.  Oh dear, it seems as if the convergence stalls at `loss = 0.05`
+- try a different activation function, for instance `tanh` (see the `model(x)` function).  Aha, after 10000 epochs, the loss has reduced to 0.003 when using `tanh`, which is pleasing.
+- try weighting the terms in the loss function differently (eg `weight_de`)
+- try changing the parameters within the optimizer (the `Adam` parameters)
+- try using a different weight and bias initialisation
+- experiment with your own ideas!
+
+What are your best values for `velocity` and `velocity_end`?  Hint, the true value of `velocity` is positive, while `velocity_end` is negative.
+
+
 
 <a name="rungekutta"></a>
 ## Discrete time integration
